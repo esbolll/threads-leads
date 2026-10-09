@@ -32,6 +32,9 @@ Single binary: `go build -o threads-leads.exe .`
   screencast of the call, and "Become a Tech Provider" = Meta business verification (legal entity documents).
 - Token check: `GET graph.threads.net/v1.0/debug_token?input_token=T&access_token=T` -> `data.scopes`.
 - `.env` holds THREADS_TOKEN / THREADS_APP_ID / THREADS_APP_SECRET; never print or commit it.
+- 2026-10-09: business portfolio "ИП Konsbayev" created, identity + business verification submitted (decision up to 48 h / 5 business days,
+  to esbol@bk.ru). App settings done: privacy/terms/data-deletion on https://esbolll.github.io/threads-leads/, icon, category.
+  Next after approval: App Review request for threads_keyword_search using docs/app-review.md (needs a screencast).
 
 ## Layout
 - `config.go` — queries, keyword lists, pacing.
