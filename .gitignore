@@ -1,4 +1,5 @@
 threads_profile/
 output/
+data/
 .env
 *.exe

@@ -29,17 +29,17 @@ Data handling:
 ## Step-by-step test instructions for the reviewer
 
 1. The app is a desktop command-line tool; there is no public UI. See the screencast.
-2. Run `threads-leads.exe -api "looking for devops"`.
+2. Run `threads-leads.exe run -api "looking for devops"`.
 3. The tool verifies the token with GET /me, then calls GET /keyword_search?q=looking%20for%20devops&search_type=RECENT.
-4. Matching public posts are printed with username, text excerpt and permalink and saved to output/leads.json.
+4. Matching public posts are printed with username, text excerpt and permalink and stored in SQLite (data/leads.db); `threads-leads.exe export` prints them as JSON.
 
 ## Screencast checklist (1–2 minutes, no cuts)
 
 1. Show the app dashboard with the Threads use case and the threads_keyword_search permission.
-2. Show the terminal: run `threads-leads.exe -api "looking for devops"`.
+2. Show the terminal: run `threads-leads.exe run -api "looking for devops"`.
 3. Show the output: `Threads API token OK`, the search line, results (with a test account they will be the
    operator's own posts: post something like "Test: looking for devops" before recording so the search is not empty).
-4. Show output/leads.json opened in an editor.
+4. Run `threads-leads.exe export` and show the JSON.
 5. Show the privacy policy page in a browser.
 
 ## Before submitting

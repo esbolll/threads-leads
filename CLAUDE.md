@@ -1,52 +1,57 @@
 # threads-leads
 
-Go CLI (go-rod over CDP) that searches Threads for hiring/freelance posts, filters them by rules and writes `output/leads.json`.
-Single binary: `go build -o threads-leads.exe .`
+Go CLI that searches Threads for hiring/freelance IT posts, stores them in SQLite and sends new leads to Telegram.
+Two data sources behind one interface: Google Chrome over CDP (go-rod, persistent profile) and the official Threads API.
+
+Build: `make build` (or `go build -o threads-leads.exe ./cmd/app`). Tests: `make test`.
 
 ## Commands
-- `threads-leads.exe -login` — open Chrome with the persistent profile, wait for manual login, exit.
-- `threads-leads.exe -explore "query"` — dump DOM facts to `output/explore.json`, `search.html`, `search.png`.
-- `threads-leads.exe [-v] [-headless] [query ...]` — full run; no args = all queries from `config.go`.
-- `-skip-login` — diagnostics only, do not wait for a session.
+- `threads-leads.exe run [-api] [-no-notify] [query ...]` — collect, classify, store, notify. No queries = all from `config/queries.go`.
+- `threads-leads.exe login` — open Chrome with the profile, wait for manual login, exit.
+- `threads-leads.exe explore "query"` — dump DOM facts (`explore.json`, `search.html`, `search.png`) into OUTPUT_DIR.
+- `threads-leads.exe auth` — OAuth for a Threads API token with `threads_keyword_search`; writes THREADS_TOKEN into .env.
+- `threads-leads.exe tg test | tg chats` — Telegram smoke test / find the channel id.
+- `threads-leads.exe export -n 100`, `threads-leads.exe stats`.
+
+## Layout (same conventions as myor/backend and whatsapp-go)
+- `cmd/app/main.go` — subcommands and flags only.
+- `app/app.go` — wiring: config → repo → source → collector → notifier.
+- `config/` — `caarlos0/env` + `godotenv` config, search queries, `.env` writer.
+- `internal/lead/{model,repository,usecase}` — Post/Lead, SQLite (sqlx + modernc, migrations via golang-migrate iofs), Collector.
+- `internal/filter/` — relevance rules (TECH + HIRING, negative patterns), category; tests.
+- `internal/source/browser/` — go-rod client; `selectors.go` is the only file to touch when Threads changes markup.
+- `internal/source/threadsapi/` — API client (`keyword_search`, `/me`, `debug_token`) and the OAuth flow.
+- `internal/notify/telegram/` — bot client, message format.
+- `migrations/` — embedded SQL. `data/leads.db` is gitignored.
+- `docs/` — GitHub Pages (privacy, terms, data deletion), app icon, App Review notes.
+
+## Data flow
+Source.Search(query) → posts upserted into `posts` (first_seen/last_seen) → filter.Classify → `leads` (notified_at NULL)
+→ after all queries, every lead with notified_at NULL is printed, sent to Telegram if configured, and marked. Reruns never resend.
 
 ## Hard-won facts (2026-10-09)
-- Chrome launched with `--enable-automation` (go-rod default) gets a 404 shell from threads.com and Meta drops the
-  session server-side right after login. `launcher.Delete("enable-automation")` fixes it; keep `disable-blink-features=AutomationControlled`.
-- Direct search URL works: `https://www.threads.com/search?q=<q>&serp_type=default` (needs a logged-in session; logged out shows "No results").
-  Typing into the search box is only a fallback; the login modal covers the input when logged out.
-- Never mix browsers on one profile: a cookie DB written by Playwright's Chromium is unreadable by Google Chrome
-  (different encryption) and gets wiped. The profile is Google Chrome only (`launcher.LookPath()`), override with `THREADS_CHROME`.
-- Instagram throttles confirmation codes after ~3 logins in an hour. Do not ask the user to re-login repeatedly;
-  make sure session persistence is proven before asking for another login.
-- The Claude Code Bash/PowerShell sandbox cannot spawn a headed Chrome (`spawn UNKNOWN`) and virtualises `%LOCALAPPDATA%`
-  writes. Run anything that opens a window from the user's terminal panel.
-- Session check = cookies `sessionid` + `ds_user_id` on a `*threads*` domain. Instagram-only cookies mean the Threads step of login was not finished.
-- Ctrl-C handling closes Chrome; otherwise orphaned Chrome holds the profile lock and the next launch fails with "Failed to get the debug url".
+- Chrome with `--enable-automation` (go-rod default) gets a 404 shell from threads.com and Meta drops the session right after
+  login. `launcher.Delete("enable-automation")` fixes it; keep `disable-blink-features=AutomationControlled`.
+- Never call `launcher.Cleanup()`: it deletes the user data dir (the saved session). This caused three "lost session" rounds.
+- Direct search URL works: `https://www.threads.com/search?q=<q>&serp_type=default` (logged-in only). Typing into the box is a fallback.
+- Never mix browsers on one profile: Playwright Chromium cookies are unreadable by Google Chrome and get wiped.
+- Instagram throttles confirmation codes after ~3 logins in an hour. Prove session persistence before asking for another login.
+- The Claude Code Bash/PowerShell sandbox cannot spawn a headed Chrome and virtualises `%LOCALAPPDATA%` writes:
+  run anything that opens a window from the user's terminal panel.
+- Session check = cookies `sessionid` + `ds_user_id` on a `*threads*` domain. Instagram-only cookies mean the Threads step was not finished.
+- Orphaned Chrome holds the profile lock → next launch fails with "Failed to get the debug url". Ctrl-C now closes Chrome.
 
-## Threads API status (2026-10-09)
+## Threads API status
 - App "Threads Leads" (Threads app id 1804019570933559), user @yesbolkonsbayev is a Threads Tester.
-- The dashboard "User Token Generator" issues tokens WITHOUT `threads_keyword_search` (fixed scope set). Use `threads-leads.exe -auth`
-  (OAuth, redirect `https://localhost:8443/callback`, needs THREADS_APP_ID/SECRET in .env) to get a token with the scope.
-- With the scope, `/keyword_search` answers 200 but `{"data":[]}` for every query: until App Review approves
-  `threads_keyword_search` it searches only the token owner's own posts. App Review needs: privacy policy URL, app icon,
-  screencast of the call, and "Become a Tech Provider" = Meta business verification (legal entity documents).
-- Token check: `GET graph.threads.net/v1.0/debug_token?input_token=T&access_token=T` -> `data.scopes`.
-- `.env` holds THREADS_TOKEN / THREADS_APP_ID / THREADS_APP_SECRET; never print or commit it.
-- 2026-10-09: business portfolio "ИП Konsbayev" created, identity + business verification submitted (decision up to 48 h / 5 business days,
-  to esbol@bk.ru). App settings done: privacy/terms/data-deletion on https://esbolll.github.io/threads-leads/, icon, category.
-  Next after approval: App Review request for threads_keyword_search using docs/app-review.md (needs a screencast).
-
-## Layout
-- `config.go` — queries, keyword lists, pacing.
-- `selectors.go` — every DOM selector and the in-page JS; the only file to touch when Threads changes markup.
-- `browser.go` — launcher, login wait, navigation, scrolling, extraction calls.
-- `filters.go` — relevance rules (TECH + HIRING, negative patterns), category, dedupe. Tests in `filters_test.go`.
-- `api.go` — official API source (`-api`): keyword_search + /me check.
-- `auth.go` — OAuth flow (`-auth`) with a self-signed localhost TLS callback; writes THREADS_TOKEN to .env.
-- `main.go` — CLI; both sources feed `collectAll` (filter, print, save).
+- The dashboard token generator never includes `threads_keyword_search`; use `auth` (OAuth, redirect `https://localhost:8443/callback`).
+- With the scope, `/keyword_search` returns `{"data":[]}` for everything until App Review approves it (searches own posts only).
+- 2026-10-09: business portfolio "ИП Konsbayev" created, identity + business verification submitted (up to 48 h / 5 business days).
+  App settings done: privacy/terms/data-deletion at https://esbolll.github.io/threads-leads/, icon, category.
+- Next after approval: App Review request using `docs/app-review.md` (needs a screencast; post a test "looking for devops" first).
+- `.env` holds THREADS_TOKEN / THREADS_APP_ID / THREADS_APP_SECRET / TELEGRAM_*; never print or commit it.
 
 ## Next
-1. After login works: run `-explore`, verify `data-pressable-container` / `time[datetime]` / text leaves against real cards, adjust `selectors.go`.
-2. First full run, tune negative patterns on real output.
-3. Telegram: bot `sendMessage` to a channel with link + author + first 300 chars. Not before live leads are seen.
-4. Threads API (`threads_keyword_search`, 2200 queries/day) as a replacement data source once App Review passes.
+1. Browser path: one more `login` (Instagram code throttling permitting), then `explore` to verify selectors on real cards, then `run`.
+2. Telegram: user creates bot + channel, `tg chats` → TELEGRAM_CHAT_ID, `tg test`.
+3. Scheduled runs every 10–20 min (API mode fits a Docker container; browser mode needs the desktop).
+4. LLM classification and lead scoring after rules are tuned on real data.

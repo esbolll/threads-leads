@@ -1,6 +1,11 @@
-package main
+package filter
 
-import "testing"
+import (
+	"testing"
+	"time"
+
+	"github.com/esbolll/threads-leads/internal/lead/model"
+)
 
 func TestClassify(t *testing.T) {
 	cases := []struct {
@@ -17,8 +22,9 @@ func TestClassify(t *testing.T) {
 		{"Ищу работу devops, рассмотрю предложения", false, ""},
 		{"I need a needle, not a developer", true, "unknown"},
 	}
+	now := time.Now()
 	for _, c := range cases {
-		lead, ok := classify(Post{Text: c.text})
+		lead, ok := Classify(model.Post{Text: c.text}, now)
 		if ok != c.want {
 			t.Errorf("%q: relevant=%v want %v (tech=%v intent=%v)", c.text, ok, c.want, lead.MatchedTech, lead.MatchedIntent)
 			continue
@@ -31,9 +37,21 @@ func TestClassify(t *testing.T) {
 
 func TestWordMatch(t *testing.T) {
 	if wordMatch("needle", "need") {
-		t.Error("need should not match inside needle")
+		t.Error("need must not match inside needle")
 	}
 	if !wordMatch("ищем devops-инженера", "devops") {
-		t.Error("devops should match before hyphen as boundary")
+		t.Error("hyphen must act as a word boundary")
+	}
+}
+
+func TestPostKey(t *testing.T) {
+	a := model.Post{Permalink: "https://www.threads.com/@u/post/abc?x=1"}
+	b := model.Post{Permalink: "https://www.threads.com/@u/post/abc/"}
+	if a.Key() != b.Key() {
+		t.Errorf("keys differ: %s vs %s", a.Key(), b.Key())
+	}
+	c := model.Post{Username: "u", Text: "hi"}
+	if c.Key() == "" || c.Key()[:5] != "hash:" {
+		t.Errorf("hash key expected, got %s", c.Key())
 	}
 }

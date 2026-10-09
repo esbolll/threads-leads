@@ -1,4 +1,4 @@
-package main
+package browser
 
 import "strings"
 
@@ -13,6 +13,8 @@ var selectors = map[string]string{
 	// search box on /search
 	"__SEARCH_INPUT__": "input[type='search'],input[placeholder*='Search'],input[placeholder*='Поиск'],input[aria-label*='Search'],input[aria-label*='Поиск']",
 }
+
+func sel(name string) string { return selectors[name] }
 
 func withSelectors(js string) string {
 	pairs := make([]string, 0, len(selectors)*2)
