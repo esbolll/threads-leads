@@ -13,6 +13,8 @@ import (
 // searchFunc is a data source: one query in, raw posts out.
 type searchFunc func(query string) ([]Post, error)
 
+var notifyEnabled = true
+
 func main() {
 	useAPI := flag.Bool("api", false, "use the official Threads API (THREADS_TOKEN from env or .env) instead of the browser")
 	auth := flag.Bool("auth", false, "run the OAuth flow to obtain a token with threads_keyword_search and save it to .env")
@@ -21,12 +23,25 @@ func main() {
 	explore := flag.String("explore", "", "open a search for this query and dump DOM facts to output/")
 	skipLogin := flag.Bool("skip-login", false, "do not wait for login (diagnostics only)")
 	verbose := flag.Bool("v", false, "verbose step log")
+	noNotify := flag.Bool("no-notify", false, "do not send new leads to Telegram even if configured")
+	tgTest := flag.Bool("tg-test", false, "send a test message to the Telegram chat and exit")
+	tgChats := flag.Bool("tg-chats", false, "list chats the Telegram bot has seen (to find a channel id) and exit")
 	flag.Parse()
+	notifyEnabled = !*noNotify
 
 	_ = os.MkdirAll(outputDir, 0o755)
 
 	var err error
-	if *auth {
+	if *tgTest || *tgChats {
+		tg := newTelegramFromEnv()
+		if tg == nil {
+			err = fmt.Errorf("set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in .env")
+		} else if *tgChats {
+			err = tg.ListChats()
+		} else if err = tg.SendText("threads-leads: test message OK"); err == nil {
+			fmt.Println("Telegram test message sent")
+		}
+	} else if *auth {
 		err = runAuth()
 	} else if *useAPI {
 		err = runAPI(flag.Args())
@@ -154,12 +169,41 @@ func collectAll(queries []string, src searchFunc) error {
 	}
 
 	leads = dedupeLeads(leads)
-	fmt.Println()
+	seen := loadSeen()
+	var fresh []Lead
 	for _, l := range leads {
+		if seen.IsNew(l.Post) {
+			fresh = append(fresh, l)
+		}
+	}
+
+	fmt.Println()
+	for _, l := range fresh {
 		printLead(l)
 	}
 	fmt.Println(strings.Repeat("-", 27))
-	fmt.Printf("Total leads: %d\n", len(leads))
+	fmt.Printf("Total leads: %d, new: %d\n", len(leads), len(fresh))
+
+	if tg := newTelegramFromEnv(); tg != nil && notifyEnabled && len(fresh) > 0 {
+		sent := 0
+		for _, l := range fresh {
+			if err := tg.SendLead(l); err != nil {
+				fmt.Println("  telegram:", err)
+				continue
+			}
+			sent++
+			seen.Mark(l.Post)
+			time.Sleep(1100 * time.Millisecond) // channel limit is about 1 msg/s
+		}
+		fmt.Printf("Sent to Telegram: %d\n", sent)
+	} else {
+		for _, l := range fresh {
+			seen.Mark(l.Post)
+		}
+	}
+	if err := seen.Save(); err != nil {
+		return err
+	}
 
 	if err := writeJSON(leadsFile, leads); err != nil {
 		return err
