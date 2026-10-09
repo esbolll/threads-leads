@@ -1,0 +1,4 @@
+threads_profile/
+output/
+.env
+*.exe
