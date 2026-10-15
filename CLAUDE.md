@@ -45,7 +45,7 @@ Source.Search(query) → posts upserted into `posts` (first_seen/last_seen) → 
 - App "Threads Leads" (Threads app id 1804019570933559), user @yesbolkonsbayev is a Threads Tester.
 - The dashboard token generator never includes `threads_keyword_search`; use `auth` (OAuth, redirect `https://localhost:8443/callback`).
 - With the scope, `/keyword_search` returns `{"data":[]}` for everything until App Review approves it (searches own posts only).
-- 2026-10-09: business portfolio "ИП Konsbayev" created, identity + business verification submitted (up to 48 h / 5 business days).
+- 2026-10-15: business verification APPROVED (portfolio "ИП Konsbayev", registry match). Identity check needed a real camera photo of the physical ID; scans and resized photos were rejected twice.
   App settings done: privacy/terms/data-deletion at https://esbolll.github.io/threads-leads/, icon, category.
 - Next after approval: App Review request using `docs/app-review.md` (needs a screencast; post a test "looking for devops" first).
 - `.env` holds THREADS_TOKEN / THREADS_APP_ID / THREADS_APP_SECRET / TELEGRAM_*; never print or commit it.

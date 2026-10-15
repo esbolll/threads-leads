@@ -23,8 +23,8 @@ Data handling:
 - Only public posts returned by the API are processed.
 - Data is stored locally on the operator's computer, retained for at most 90 days, never shared or sold.
 - The app does not publish, reply, like or follow. It only reads search results.
-- Privacy policy: <PAGES_URL>/privacy-policy.html
-- Data deletion: <PAGES_URL>/data-deletion.html
+- Privacy policy: https://esbolll.github.io/threads-leads/privacy-policy.html
+- Data deletion: https://esbolll.github.io/threads-leads/data-deletion.html
 
 ## Step-by-step test instructions for the reviewer
 
