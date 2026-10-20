@@ -47,7 +47,11 @@ Source.Search(query) → posts upserted into `posts` (first_seen/last_seen) → 
 - With the scope, `/keyword_search` returns `{"data":[]}` for everything until App Review approves it (searches own posts only).
 - 2026-10-15: business verification APPROVED (portfolio "ИП Konsbayev", registry match). Identity check needed a real camera photo of the physical ID; scans and resized photos were rejected twice.
   App settings done: privacy/terms/data-deletion at https://esbolll.github.io/threads-leads/, icon, category.
-- Next after approval: App Review request using `docs/app-review.md` (needs a screencast; post a test "looking for devops" first).
+- 2026-10-20: App Review SUBMITTED for threads_keyword_search + threads_basic (status "in review", Meta says up to 20 days).
+  Screencast had to show the OAuth consent (`auth` command) — the form requires it. Platform "Website" added
+  (https://esbolll.github.io/threads-leads/) because reviewer instructions need a platform; Facebook Login = No.
+  Test post "Test: looking for devops" on @yesbolkonsbayev makes keyword_search return 1 result for the demo.
+- If rejected: read the reason in Required actions → App Review, fix, resubmit. Texts live in `docs/app-review.md`.
 - `.env` holds THREADS_TOKEN / THREADS_APP_ID / THREADS_APP_SECRET / TELEGRAM_*; never print or commit it.
 
 ## Next
