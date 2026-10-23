@@ -56,7 +56,8 @@ type Summary struct {
 	Sent     int
 }
 
-// Run searches every query, stores posts, classifies leads and notifies the new ones.
+// Run searches every query, stores posts, classifies leads and notifies the new ones
+// right after each query, so leads reach the channel without waiting for the whole pass.
 func (c *Collector) Run(ctx context.Context, queries []string) (Summary, error) {
 	var sum Summary
 	now := time.Now().UTC()
@@ -93,22 +94,38 @@ func (c *Collector) Run(ctx context.Context, queries []string) (Summary, error) 
 			}
 		}
 		sum.Leads += relevant
-		fmt.Fprintf(c.out, "Found: %d posts\n", len(posts))
-		fmt.Fprintf(c.out, "Relevant: %d\n", relevant)
+		fmt.Fprintf(c.out, "Found: %d posts, relevant: %d\n", len(posts), relevant)
+
+		newLeads, sent, err := c.flush(ctx, now)
+		if err != nil {
+			return sum, err
+		}
+		sum.NewLeads += newLeads
+		sum.Sent += sent
+		if newLeads > 0 {
+			fmt.Fprintf(c.out, "New leads: %d, sent: %d\n", newLeads, sent)
+		}
 	}
 
+	fmt.Fprintln(c.out, strings.Repeat("-", 27))
+	fmt.Fprintf(c.out, "Pass done: posts %d (new %d), leads %d, new leads %d, sent %d\n",
+		sum.Posts, sum.NewPosts, sum.Leads, sum.NewLeads, sum.Sent)
+	return sum, nil
+}
+
+// flush prints and sends every lead not yet notified, newest post first, and marks it.
+func (c *Collector) flush(ctx context.Context, now time.Time) (newLeads, sent int, err error) {
 	fresh, err := c.repo.Unnotified(ctx)
 	if err != nil {
-		return sum, err
+		return 0, 0, err
 	}
-	// Newest posts first; too-old ones are silently marked so they never show up later.
 	if c.MaxAge > 0 {
 		cutoff := now.Add(-c.MaxAge)
 		kept := fresh[:0]
 		for _, l := range fresh {
 			if t := postedAt(l); !t.IsZero() && t.Before(cutoff) {
 				if err := c.repo.MarkNotified(ctx, l.Key(), now); err != nil {
-					return sum, err
+					return 0, 0, err
 				}
 				continue
 			}
@@ -117,32 +134,26 @@ func (c *Collector) Run(ctx context.Context, queries []string) (Summary, error) 
 		fresh = kept
 	}
 	sort.SliceStable(fresh, func(i, j int) bool { return postedAt(fresh[i]).After(postedAt(fresh[j])) })
-	sum.NewLeads = len(fresh)
 
-	fmt.Fprintln(c.out)
 	for _, l := range fresh {
 		printLead(c.out, l)
-	}
-	fmt.Fprintln(c.out, strings.Repeat("-", 27))
-	fmt.Fprintf(c.out, "Posts: %d (new %d), leads this run: %d, new leads: %d\n", sum.Posts, sum.NewPosts, sum.Leads, sum.NewLeads)
-
-	for _, l := range fresh {
 		if c.notifier != nil {
 			if err := c.notifier.SendLead(ctx, l); err != nil {
 				c.log.WithError(err).WithField("permalink", l.Permalink).Warn("notify failed")
-				continue
+				continue // stays unnotified, retried after the next query
 			}
-			sum.Sent++
-			time.Sleep(1100 * time.Millisecond) // Telegram channel limit is about 1 msg/s
+			sent++
+			select {
+			case <-time.After(1100 * time.Millisecond): // Telegram channel limit is about 1 msg/s
+			case <-ctx.Done():
+				return len(fresh), sent, ctx.Err()
+			}
 		}
 		if err := c.repo.MarkNotified(ctx, l.Key(), time.Now().UTC()); err != nil {
-			return sum, err
+			return len(fresh), sent, err
 		}
 	}
-	if c.notifier != nil {
-		fmt.Fprintf(c.out, "Sent to Telegram: %d\n", sum.Sent)
-	}
-	return sum, nil
+	return len(fresh), sent, nil
 }
 
 func printLead(w io.Writer, l model.Lead) {
