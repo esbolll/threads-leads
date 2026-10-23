@@ -11,6 +11,8 @@ type Config struct {
 	DBPath    string `env:"DB_PATH" envDefault:"data/leads.db"`
 	OutputDir string `env:"OUTPUT_DIR" envDefault:"output"`
 	LogLevel  string `env:"LOG_LEVEL" envDefault:"info"`
+	// Leads whose post is older than this many days are stored but not shown or sent. 0 = no limit.
+	LeadMaxAgeDays int `env:"LEAD_MAX_AGE_DAYS" envDefault:"0"`
 
 	Threads  Threads
 	Browser  Browser

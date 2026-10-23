@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 	"time"
 
@@ -31,10 +32,19 @@ type Collector struct {
 	notifier Notifier // nil = print only
 	log      *logrus.Logger
 	out      io.Writer
+	MaxAge   time.Duration // > 0: leads older than this are stored but neither printed nor sent
 }
 
 func NewCollector(repo *repository.Repository, src Source, n Notifier, log *logrus.Logger, out io.Writer) *Collector {
 	return &Collector{repo: repo, source: src, notifier: n, log: log, out: out}
+}
+
+func postedAt(l model.Lead) time.Time {
+	t, err := time.Parse(time.RFC3339, l.PostedAt)
+	if err != nil {
+		return time.Time{} // unknown date sorts last
+	}
+	return t
 }
 
 type Summary struct {
@@ -91,6 +101,22 @@ func (c *Collector) Run(ctx context.Context, queries []string) (Summary, error) 
 	if err != nil {
 		return sum, err
 	}
+	// Newest posts first; too-old ones are silently marked so they never show up later.
+	if c.MaxAge > 0 {
+		cutoff := now.Add(-c.MaxAge)
+		kept := fresh[:0]
+		for _, l := range fresh {
+			if t := postedAt(l); !t.IsZero() && t.Before(cutoff) {
+				if err := c.repo.MarkNotified(ctx, l.Key(), now); err != nil {
+					return sum, err
+				}
+				continue
+			}
+			kept = append(kept, l)
+		}
+		fresh = kept
+	}
+	sort.SliceStable(fresh, func(i, j int) bool { return postedAt(fresh[i]).After(postedAt(fresh[j])) })
 	sum.NewLeads = len(fresh)
 
 	fmt.Fprintln(c.out)
