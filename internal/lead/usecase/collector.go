@@ -33,6 +33,8 @@ type Collector struct {
 	log      *logrus.Logger
 	out      io.Writer
 	MaxAge   time.Duration // > 0: leads older than this are stored but neither printed nor sent
+	// CurrentMonthOnly drops leads posted before the first day of the current month (local time).
+	CurrentMonthOnly bool
 }
 
 func NewCollector(repo *repository.Repository, src Source, n Notifier, log *logrus.Logger, out io.Writer) *Collector {
@@ -113,14 +115,24 @@ func (c *Collector) Run(ctx context.Context, queries []string) (Summary, error) 
 	return sum, nil
 }
 
-// flush prints and sends every lead not yet notified, newest post first, and marks it.
+// flush prints and sends every lead not yet notified, oldest post first, and marks it.
 func (c *Collector) flush(ctx context.Context, now time.Time) (newLeads, sent int, err error) {
 	fresh, err := c.repo.Unnotified(ctx)
 	if err != nil {
 		return 0, 0, err
 	}
+	var cutoff time.Time
 	if c.MaxAge > 0 {
-		cutoff := now.Add(-c.MaxAge)
+		cutoff = now.Add(-c.MaxAge)
+	}
+	if c.CurrentMonthOnly {
+		local := time.Now()
+		monthStart := time.Date(local.Year(), local.Month(), 1, 0, 0, 0, 0, local.Location())
+		if monthStart.After(cutoff) {
+			cutoff = monthStart
+		}
+	}
+	if !cutoff.IsZero() {
 		kept := fresh[:0]
 		for _, l := range fresh {
 			if t := postedAt(l); !t.IsZero() && t.Before(cutoff) {
@@ -133,7 +145,8 @@ func (c *Collector) flush(ctx context.Context, now time.Time) (newLeads, sent in
 		}
 		fresh = kept
 	}
-	sort.SliceStable(fresh, func(i, j int) bool { return postedAt(fresh[i]).After(postedAt(fresh[j])) })
+	// Oldest first so the newest lead ends up at the bottom of the channel.
+	sort.SliceStable(fresh, func(i, j int) bool { return postedAt(fresh[i]).Before(postedAt(fresh[j])) })
 
 	for _, l := range fresh {
 		printLead(c.out, l)

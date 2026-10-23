@@ -13,6 +13,8 @@ type Config struct {
 	LogLevel  string `env:"LOG_LEVEL" envDefault:"info"`
 	// Leads whose post is older than this many days are stored but not shown or sent. 0 = no limit.
 	LeadMaxAgeDays int `env:"LEAD_MAX_AGE_DAYS" envDefault:"0"`
+	// Only leads posted in the current calendar month are shown or sent.
+	LeadCurrentMonthOnly bool `env:"LEAD_CURRENT_MONTH_ONLY" envDefault:"false"`
 
 	Threads  Threads
 	Browser  Browser
