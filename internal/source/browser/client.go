@@ -9,7 +9,9 @@ import (
 	"math/rand"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -82,7 +84,13 @@ func New(opts Options, log *logrus.Logger) (*Client, error) {
 
 	u, err := l.Launch()
 	if err != nil {
-		return nil, fmt.Errorf("launch browser: %w", err)
+		// Usually an orphaned Chrome still holding the profile lock: kill it and retry once.
+		log.WithError(err).Warn("launch failed, killing orphaned Chrome on this profile and retrying")
+		killOrphans(dir)
+		time.Sleep(2 * time.Second)
+		if u, err = l.Launch(); err != nil {
+			return nil, fmt.Errorf("launch browser: %w", err)
+		}
 	}
 	b := rod.New().ControlURL(u)
 	if err := b.Connect(); err != nil {
@@ -99,6 +107,18 @@ func New(opts Options, log *logrus.Logger) (*Client, error) {
 		return nil, err
 	}
 	return &Client{opts: opts, log: log, browser: b, page: page}, nil
+}
+
+// killOrphans terminates Chrome processes whose command line references our profile dir (Windows only).
+func killOrphans(profileDir string) {
+	if runtime.GOOS != "windows" {
+		return
+	}
+	needle := strings.ReplaceAll(profileDir, "'", "''")
+	script := "Get-CimInstance Win32_Process -Filter \"Name='chrome.exe'\" | " +
+		"Where-Object { $_.CommandLine -like '*" + needle + "*' } | " +
+		"ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
+	_ = exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", script).Run()
 }
 
 // Close shuts Chrome down. Never call launcher.Cleanup(): it deletes the profile (our session).
