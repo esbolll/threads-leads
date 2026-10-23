@@ -19,6 +19,7 @@ Commands:
   run        collect leads with the browser source (default) and notify new ones
              -api        use the official Threads API instead of Chrome
              -no-notify  do not send to Telegram
+             -every 15m  keep running, pause 15m between passes (Ctrl-C to stop)
   login      open Chrome with the persistent profile, wait for manual login
   explore    dump DOM facts for one query into the output dir
   auth       OAuth flow for a Threads API token (writes THREADS_TOKEN to .env)
@@ -53,8 +54,9 @@ func main() {
 		fs := flag.NewFlagSet("run", flag.ExitOnError)
 		useAPI := fs.Bool("api", false, "use the official Threads API")
 		noNotify := fs.Bool("no-notify", false, "do not send to Telegram")
+		every := fs.Duration("every", 0, "keep running; pause between passes, e.g. 15m")
 		_ = fs.Parse(args)
-		err = a.Run(ctx, app.RunOptions{UseAPI: *useAPI, Notify: !*noNotify, Queries: fs.Args()})
+		err = a.Run(ctx, app.RunOptions{UseAPI: *useAPI, Notify: !*noNotify, Queries: fs.Args(), Every: *every})
 	case "login":
 		err = a.Login(ctx)
 	case "explore":

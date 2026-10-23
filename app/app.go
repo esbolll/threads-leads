@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -32,6 +33,7 @@ type RunOptions struct {
 	UseAPI  bool
 	Notify  bool
 	Queries []string
+	Every   time.Duration // > 0: keep running, pause this long between passes
 }
 
 // Run collects leads from the chosen source into SQLite and notifies new ones.
@@ -68,15 +70,31 @@ func (a *App) Run(ctx context.Context, opts RunOptions) error {
 		queries = config.SearchQueries()
 	}
 	collector := usecase.NewCollector(repo, src, notifier, a.log, a.out)
-	sum, err := collector.Run(ctx, queries)
-	if err != nil {
-		return err
+	for pass := 1; ; pass++ {
+		sum, err := collector.Run(ctx, queries)
+		if err != nil {
+			if ctx.Err() != nil {
+				return nil // interrupted by the user
+			}
+			if opts.Every <= 0 {
+				return err
+			}
+			a.log.WithError(err).Warn("pass failed, will retry after the pause")
+		}
+		a.log.WithFields(logrus.Fields{
+			"pass": pass, "queries": sum.Queries, "posts": sum.Posts, "new_posts": sum.NewPosts,
+			"leads": sum.Leads, "new_leads": sum.NewLeads, "sent": sum.Sent,
+		}).Info("pass finished")
+		if opts.Every <= 0 {
+			return nil
+		}
+		a.log.WithField("next_in", opts.Every.String()).Info("sleeping")
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-time.After(opts.Every):
+		}
 	}
-	a.log.WithFields(logrus.Fields{
-		"queries": sum.Queries, "posts": sum.Posts, "new_posts": sum.NewPosts,
-		"leads": sum.Leads, "new_leads": sum.NewLeads, "sent": sum.Sent,
-	}).Info("run finished")
-	return nil
 }
 
 func (a *App) apiClient(ctx context.Context) (*threadsapi.Client, error) {

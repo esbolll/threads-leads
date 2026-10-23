@@ -42,10 +42,15 @@ var extractJS = withSelectors(`() => {
     const t = card.querySelector("__TIME__");
     const lines = [];
     for (const el of card.querySelectorAll("__TEXT__")) {
-      if (el.closest("a")) continue;                 // usernames, link rows
+      if (el.closest("a")) continue;                 // usernames, tags, date links
       if (el.querySelector("__TEXT__")) continue;    // leaves only
-      const s = (el.innerText || "").trim();
-      if (s) lines.push(s);
+      let s = (el.innerText || "").trim();
+      s = s.replace(/\n\d+\n\/\n\d+$/, "").trim();   // carousel "1 / 2" indicator
+      if (!s) continue;
+      if (/^\d+([.,]\d+)?[KkMm]?$/.test(s)) continue; // like/reply counters
+      if (s === m[1]) continue;                      // bare username
+      if (/^(\d+[smhdw]|\d{1,2}\/\d{1,2}\/\d{2,4})$/.test(s)) continue; // "3d", "10/13/26"
+      lines.push(s);
     }
     posts.push({
       username: m[1],

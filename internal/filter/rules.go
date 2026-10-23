@@ -11,6 +11,12 @@ var TechKeywords = []string{
 	"python", "golang", "java", "node.js", "nodejs", "react", "vue", "django", "fastapi",
 	"kubernetes", "k8s", "docker", "aws", "azure", "gcp", "terraform", "ansible",
 	"ci/cd", "linux", "postgres", "postgresql",
+	// web / turnkey
+	"сайт", "сайта", "лендинг", "landing", "website", "web", "wordpress", "tilda", "битрикс", "bitrix",
+	"php", "laravel", "интернет-магазин", "интернет магазин", "верстальщик", "верстка", "вёрстка",
+	// bots / apps / automation
+	"бот", "бота", "bot", "telegram", "телеграм", "приложение", "приложения", "app", "mobile", "flutter",
+	"ios", "android", "интеграция", "автоматизация", "automation", "api", "crm", "парсер", "parser",
 }
 
 var HiringKeywords = []string{
@@ -28,6 +34,10 @@ var NegativePatterns = []string{
 	"looking for work", "looking for new opportunities", "looking for opportunities",
 	"my resume", "моё резюме", "мое резюме", "рассмотрю предложения",
 	"available for hire", "available for work", "hire me",
+	"looking for a remote role", "looking for remote job", "looking for a role", "looking for remote role",
+	"looking for new clients", "looking for clients",
+	// construction / non-IT "engineer"
+	"civil engineer", "site engineer", "m&e engineer", "project engineer", "quantity surveyor", "high rise",
 }
 
 // CategoryRules are checked in order; first match wins.

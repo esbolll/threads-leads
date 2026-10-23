@@ -54,8 +54,16 @@ Source.Search(query) → posts upserted into `posts` (first_seen/last_seen) → 
 - If rejected: read the reason in Required actions → App Review, fix, resubmit. Texts live in `docs/app-review.md`.
 - `.env` holds THREADS_TOKEN / THREADS_APP_ID / THREADS_APP_SECRET / TELEGRAM_*; never print or commit it.
 
+## Browser source status
+- 2026-10-23: session persists across restarts (Google Chrome profile, no Cleanup). `explore` confirmed the markup:
+  cards = `div[data-pressable-container]`, `time[datetime]`, `a[href^='/@']`, text leaves `div/span[dir=auto]`.
+  First real run: 3 queries → 57 posts, 39 leads, real budgets ($350–$2500 sites, DevOps projects). ~20 s per query.
+- Text extraction drops like/reply counters, carousel "1 / 2", bare username and relative dates.
+- `run -every 15m` keeps running (pause between passes). First pass should be `-no-notify` to mark the backlog,
+  otherwise Telegram gets 100+ messages at once.
+
 ## Next
-1. Browser path: one more `login` (Instagram code throttling permitting), then `explore` to verify selectors on real cards, then `run`.
-2. Telegram: user creates bot + channel, `tg chats` → TELEGRAM_CHAT_ID, `tg test`.
+1. Telegram: user creates bot + channel, `tg chats` → TELEGRAM_CHAT_ID, `tg test`, then `run -every 15m`.
+2. Tune filter on real output: "engineer" alone is too broad (construction posts); consider requiring a second tech term.
 3. Scheduled runs every 10–20 min (API mode fits a Docker container; browser mode needs the desktop).
 4. LLM classification and lead scoring after rules are tuned on real data.
