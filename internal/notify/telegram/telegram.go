@@ -65,9 +65,10 @@ func (c *Client) api(ctx context.Context, method string, params url.Values) (jso
 
 func (c *Client) SendText(ctx context.Context, text string) error {
 	_, err := c.api(ctx, "sendMessage", url.Values{
-		"chat_id":    {c.chatID},
-		"text":       {text},
-		"parse_mode": {"HTML"},
+		"chat_id":              {c.chatID},
+		"text":                 {text},
+		"parse_mode":           {"HTML"},
+		"disable_notification": {"true"}, // silent delivery
 	})
 	return err
 }
