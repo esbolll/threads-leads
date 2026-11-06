@@ -27,7 +27,15 @@ Build: `make build` (or `go build -o threads-leads.exe ./cmd/app`). Tests: `make
 
 ## Data flow
 Source.Search(query) → posts upserted into `posts` (first_seen/last_seen) → filter.Classify → `leads` (notified_at NULL)
-→ after all queries, every lead with notified_at NULL is printed, sent to Telegram if configured, and marked. Reruns never resend.
+→ right after EACH query every lead with notified_at NULL is printed, sent to Telegram (silent) and marked.
+Batches go oldest → newest so the freshest lead is at the bottom of the channel. Reruns never resend (key = permalink).
+`.env`: `LEAD_CURRENT_MONTH_ONLY=true` drops posts from earlier months, `LEAD_MAX_AGE_DAYS=N` drops older than N days.
+
+## Filter
+Relevant = tech word + hiring word CLOSE to each other: intent then tech within 60 runes ("need a developer"),
+or tech then intent within 15 ("developer needed"). Negative phrases reject job seekers, sellers advertising
+their own services ("делаю под ключ", "we build", "if you need") and construction "engineer" posts.
+Rules are in `internal/filter/rules.go`; every real false positive goes into `filter_test.go` first.
 
 ## Hard-won facts (2026-10-09)
 - Chrome with `--enable-automation` (go-rod default) gets a 404 shell from threads.com and Meta drops the session right after
@@ -51,7 +59,12 @@ Source.Search(query) → posts upserted into `posts` (first_seen/last_seen) → 
   Screencast had to show the OAuth consent (`auth` command) — the form requires it. Platform "Website" added
   (https://esbolll.github.io/threads-leads/) because reviewer instructions need a platform; Facebook Login = No.
   Test post "Test: looking for devops" on @yesbolkonsbayev makes keyword_search return 1 result for the demo.
-- If rejected: read the reason in Required actions → App Review, fix, resubmit. Texts live in `docs/app-review.md`.
+- 2026-11-06: App Review APPROVED and the app is published (Live). `keyword_search` now returns public posts
+  with the existing token (no re-auth needed). Token is long-lived, 60 days: rerun `auth` before it expires.
+- API facts: `search_type=RECENT` returns only roughly the last 24 h (2–11 posts per query); `TOP` returns popular
+  posts back to 2024 — useless for monitoring. Timestamps come as `+0000` and are normalised to RFC3339.
+  Limit 2200 queries/24 h per user: with ~100 queries per pass the app raises `-every` to ~73 min automatically.
+- API permalinks have the same shape as browser ones, so both sources dedupe against each other in one DB.
 - `.env` holds THREADS_TOKEN / THREADS_APP_ID / THREADS_APP_SECRET / TELEGRAM_*; never print or commit it.
 
 ## Browser source status
@@ -59,11 +72,10 @@ Source.Search(query) → posts upserted into `posts` (first_seen/last_seen) → 
   cards = `div[data-pressable-container]`, `time[datetime]`, `a[href^='/@']`, text leaves `div/span[dir=auto]`.
   First real run: 3 queries → 57 posts, 39 leads, real budgets ($350–$2500 sites, DevOps projects). ~20 s per query.
 - Text extraction drops like/reply counters, carousel "1 / 2", bare username and relative dates.
-- `run -every 15m` keeps running (pause between passes). First pass should be `-no-notify` to mark the backlog,
-  otherwise Telegram gets 100+ messages at once.
+- `run -every 15m` keeps running (pause between passes). A full browser pass over ~100 queries takes ~30 min.
+- If Chrome was left running, launch fails once, the app kills Chrome processes bound to the profile and retries.
 
 ## Next
-1. Telegram: user creates bot + channel, `tg chats` → TELEGRAM_CHAT_ID, `tg test`, then `run -every 15m`.
-2. Tune filter on real output: "engineer" alone is too broad (construction posts); consider requiring a second tech term.
-3. Scheduled runs every 10–20 min (API mode fits a Docker container; browser mode needs the desktop).
-4. LLM classification and lead scoring after rules are tuned on real data.
+1. Main mode now: `threads-leads.exe run -api -every 75m` (no Chrome). Browser mode stays as a wider, slower source.
+2. Filter tuning on real output; rule-based has a ceiling → LLM classification / scoring for the leads that pass rules.
+3. API mode in Docker on a server (no desktop needed); token refresh before the 60-day expiry.

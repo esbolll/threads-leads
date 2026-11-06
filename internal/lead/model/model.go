@@ -32,6 +32,17 @@ func (p Post) Key() string {
 	return "hash:" + hex.EncodeToString(sum[:])
 }
 
+// ParseTime reads a post timestamp in RFC3339 or the Threads API form (2006-01-02T15:04:05+0000).
+// The zero time means "unknown".
+func ParseTime(s string) time.Time {
+	for _, layout := range []string{time.RFC3339, "2006-01-02T15:04:05-0700", "2006-01-02T15:04:05.000Z"} {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t
+		}
+	}
+	return time.Time{}
+}
+
 // Lead is a post that passed the relevance filter.
 type Lead struct {
 	Post

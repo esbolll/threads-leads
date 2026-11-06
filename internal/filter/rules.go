@@ -36,6 +36,15 @@ var NegativePatterns = []string{
 	"available for hire", "available for work", "hire me",
 	"looking for a remote role", "looking for remote job", "looking for a role", "looking for remote role",
 	"looking for new clients", "looking for clients",
+	// sellers advertising their own services, not buyers
+	"делаю под ключ", "делаю сайты", "делаю сайт", "создаю сайты", "разрабатываю сайты", "разрабатываю",
+	"мои услуги", "наши услуги", "принимаю заказы", "беру заказы", "беру проекты", "открыт к заказам",
+	"открыт для заказов", "ищу заказы", "ищу проекты", "ищу клиентов", "помогу с", "обращайтесь",
+	"i build", "we build", "i create websites", "i design websites", "i make websites", "we create",
+	"our services", "my services", "we offer", "i offer", "open for projects", "available for projects",
+	"taking new clients", "accepting new clients", "dm me if you need", "if you need a website",
+	"if you need a developer", "need a website? ", "need a developer? ", "нужен сайт? ", "нужен разработчик? ",
+	"если вам нужен", "если вам нужна", "если вам нужно", "если нужен сайт", "если нужен разработчик", "if you need",
 	// construction / non-IT "engineer"
 	"civil engineer", "site engineer", "m&e engineer", "project engineer", "quantity surveyor", "high rise",
 }

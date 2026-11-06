@@ -26,7 +26,7 @@ type Threads struct {
 	Token       string `env:"THREADS_TOKEN"`
 	AppID       string `env:"THREADS_APP_ID"`
 	AppSecret   string `env:"THREADS_APP_SECRET"`
-	SearchLimit int    `env:"THREADS_SEARCH_LIMIT" envDefault:"50"`
+	SearchLimit int    `env:"THREADS_SEARCH_LIMIT" envDefault:"100"`
 	// Redirect URI registered in the Threads use case settings.
 	RedirectURI string `env:"THREADS_REDIRECT_URI" envDefault:"https://localhost:8443/callback"`
 }

@@ -69,6 +69,15 @@ func (a *App) Run(ctx context.Context, opts RunOptions) error {
 	if len(queries) == 0 {
 		queries = config.SearchQueries()
 	}
+	// Keep API mode under Meta's daily keyword_search limit.
+	if opts.UseAPI && opts.Every > 0 {
+		if min := threadsapi.MinInterval(len(queries)); opts.Every < min {
+			a.log.WithFields(logrus.Fields{"requested": opts.Every.String(), "using": min.String(), "queries": len(queries)}).
+				Warn("interval raised to stay under the 2200 queries/day API limit")
+			opts.Every = min
+		}
+	}
+
 	collector := usecase.NewCollector(repo, src, notifier, a.log, a.out)
 	collector.MaxAge = time.Duration(a.cfg.LeadMaxAgeDays) * 24 * time.Hour
 	collector.CurrentMonthOnly = a.cfg.LeadCurrentMonthOnly

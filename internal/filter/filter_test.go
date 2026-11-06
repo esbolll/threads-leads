@@ -21,6 +21,18 @@ func TestClassify(t *testing.T) {
 		{"5 лучших инструментов для разработчика.", false, ""},
 		{"Ищу работу devops, рассмотрю предложения", false, ""},
 		{"I need a needle, not a developer", true, "unknown"},
+		// real posts from the first runs
+		{"I need help opening a website il pay $2500 to anyone who can help me", true, "unknown"},
+		{"Hi we are looking for developers to build an event management website for $2500 with admin feature.", true, "unknown"},
+		{"WE ARE HIRING\nAnybody with a Devops experience should check this JD and forward cv to me", true, "job"},
+		{"I need someone to create a business website for me .", true, "unknown"},
+		{"Senior python developer needed for a short contract", true, "contract"},
+		// noise: intent and tech far apart or in the wrong order
+		{"Check in Atomy website. There are many things that you need not just only skincare.", false, ""},
+		// sellers advertising themselves
+		{"Привет! Я Дима, дизайнер и разработчик сайтов. Делаю под ключ — от структуры до дизайна. Нужен сайт? Пишите", false, ""},
+		{"Разрабатываю сайты и веб-приложения, создаю AI-агентов. Ищу проекты.", false, ""},
+		{"We build websites and apps for startups. Need a website? DM us", false, ""},
 	}
 	now := time.Now()
 	for _, c := range cases {

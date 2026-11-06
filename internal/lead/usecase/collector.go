@@ -41,13 +41,7 @@ func NewCollector(repo *repository.Repository, src Source, n Notifier, log *logr
 	return &Collector{repo: repo, source: src, notifier: n, log: log, out: out}
 }
 
-func postedAt(l model.Lead) time.Time {
-	t, err := time.Parse(time.RFC3339, l.PostedAt)
-	if err != nil {
-		return time.Time{} // unknown date sorts last
-	}
-	return t
-}
+func postedAt(l model.Lead) time.Time { return model.ParseTime(l.PostedAt) }
 
 type Summary struct {
 	Queries  int

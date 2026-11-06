@@ -30,7 +30,7 @@ type Client struct {
 
 func New(token string, limit int) *Client {
 	if limit <= 0 || limit > 100 {
-		limit = 50
+		limit = 100
 	}
 	return &Client{token: token, limit: limit, http: &http.Client{Timeout: 30 * time.Second}}
 }
@@ -101,7 +101,7 @@ func (c *Client) Search(ctx context.Context, query string) ([]model.Post, error)
 			Text:        d.Text,
 			Permalink:   d.Permalink,
 			PostID:      d.ID,
-			PostedAt:    d.Timestamp,
+			PostedAt:    normalizeTime(d.Timestamp),
 			SearchQuery: query,
 		})
 	}
@@ -111,6 +111,26 @@ func (c *Client) Search(ctx context.Context, query string) ([]model.Post, error)
 	case <-ctx.Done():
 	}
 	return posts, nil
+}
+
+// normalizeTime converts the API timestamp (…+0000) to RFC3339 UTC; unknown formats pass through.
+func normalizeTime(s string) string {
+	if t := model.ParseTime(s); !t.IsZero() {
+		return t.UTC().Format(time.RFC3339)
+	}
+	return s
+}
+
+// QueriesPerDay is the documented keyword_search limit per user in a rolling 24 h window.
+const QueriesPerDay = 2200
+
+// MinInterval returns the shortest pause between passes that keeps n queries per pass under the daily limit.
+func MinInterval(n int) time.Duration {
+	if n <= 0 {
+		return 0
+	}
+	budget := QueriesPerDay * 9 / 10 // keep 10% headroom
+	return time.Duration(float64(24*time.Hour) * float64(n) / float64(budget)).Round(time.Minute)
 }
 
 // Me verifies the token and returns the username it belongs to.

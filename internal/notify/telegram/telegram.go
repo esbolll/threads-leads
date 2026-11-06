@@ -84,7 +84,7 @@ func Format(l model.Lead) string {
 		text = string(r[:400]) + "…"
 	}
 	date := l.PostedAt
-	if ts, err := time.Parse(time.RFC3339, l.PostedAt); err == nil {
+	if ts := model.ParseTime(l.PostedAt); !ts.IsZero() {
 		date = ts.Local().Format("02.01.2006 15:04")
 	} else if len(date) > 10 {
 		date = date[:10]
