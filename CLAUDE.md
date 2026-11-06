@@ -87,8 +87,22 @@ Queries: `config/queries.go` = dev RU, devops RU, web RU, Kazakh, English pinned
 - `run -every 15m` keeps running (pause between passes). A full browser pass over ~100 queries takes ~30 min.
 - If Chrome was left running, launch fails once, the app kills Chrome processes bound to the profile and retries.
 
+## Deployment (server `kds`, since 2026-11-06)
+- `ssh kds`, project in `/home/ubuntu/threads-leads` (git clone of this repo), runs in Docker: API mode only,
+  `docker-compose.yml` → `run -api -every 60m`, `restart: unless-stopped`, TZ Asia/Almaty, `./data` volume (SQLite).
+- `.env` and `data/leads.db` were copied from the dev machine (not in git). `.env` on the server must have LF line
+  endings: `sed -i "s/$//" .env`, otherwise Docker reads tokens with a trailing CR.
+- Update: `git push` here, then `ssh kds 'cd /home/ubuntu/threads-leads && git pull && docker compose up -d --build'`.
+- Logs: `ssh kds 'cd /home/ubuntu/threads-leads && docker compose logs --tail 100'`. Stats: `docker compose run --rm threads-leads stats`.
+- Token expires 60 days after `auth` (last run 2026-10-20 → about 2026-12-19). `auth` needs a browser, so run it on the
+  dev machine and copy the new THREADS_TOKEN into the server `.env`, then `docker compose up -d`.
+- Do NOT run `run -api` locally while the server runs: both use the same per-user quota (2200 queries/day) and the
+  local DB does not know what the server already sent. The server disk is 89% full; the image is small, logs are capped.
+- First server pass: 80 queries → 334 posts → 6 sent, 1 real order. Recent RU posts are dominated by sellers' ads;
+  rules alone will not fix that.
+
 ## Next
 1. Main mode now: `threads-leads.exe run -api -every 60m` (no Chrome; ~80 queries → min interval ~58 min).
    Browser mode stays as a wider, slower source.
-2. Filter tuning on real output; rule-based has a ceiling → LLM classification / scoring for the leads that pass rules.
-3. API mode in Docker on a server (no desktop needed); token refresh before the 60-day expiry.
+2. LLM classification of leads that pass the rules (buyer vs seller vs chatter) — the remaining noise is seller ads.
+3. Token refresh before the 60-day expiry (see Deployment).
