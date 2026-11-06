@@ -11,7 +11,7 @@ Build: `make build` (or `go build -o threads-leads.exe ./cmd/app`). Tests: `make
 - `threads-leads.exe explore "query"` — dump DOM facts (`explore.json`, `search.html`, `search.png`) into OUTPUT_DIR.
 - `threads-leads.exe auth` — OAuth for a Threads API token with `threads_keyword_search`; writes THREADS_TOKEN into .env.
 - `threads-leads.exe tg test | tg chats` — Telegram smoke test / find the channel id.
-- `threads-leads.exe export -n 100`, `threads-leads.exe stats`.
+- `threads-leads.exe export -n 100`, `threads-leads.exe stats`, `threads-leads.exe reclassify`.
 
 ## Layout (same conventions as myor/backend and whatsapp-go)
 - `cmd/app/main.go` — subcommands and flags only.
@@ -32,10 +32,22 @@ Batches go oldest → newest so the freshest lead is at the bottom of the channe
 `.env`: `LEAD_CURRENT_MONTH_ONLY=true` drops posts from earlier months, `LEAD_MAX_AGE_DAYS=N` drops older than N days.
 
 ## Filter
-Relevant = tech word + hiring word CLOSE to each other: intent then tech within 60 runes ("need a developer"),
-or tech then intent within 15 ("developer needed"). Negative phrases reject job seekers, sellers advertising
-their own services ("делаю под ключ", "we build", "if you need") and construction "engineer" posts.
-Rules are in `internal/filter/rules.go`; every real false positive goes into `filter_test.go` first.
+A hiring word must sit next to a tech word: intent then tech within 40 runes ("need a developer"), or tech then
+intent within 15 ("developer needed"). Role words (StrongTech: разработчик, devops, python) are enough alone.
+Thing words (WeakTech: сайт, бот, app, crm) are everyday talk, so they also need a SeekMarker: a person to hire or
+money ("ищу", "кто сделает", "специалист", "бюджет", "срочно", "тг", "$"). "проект"/"заказ" are category words only.
+Negative phrases reject job seekers, sellers advertising themselves and non-IT "engineer" posts.
+Rules: `internal/filter/rules.go`. Every real false positive or missed lead goes into `filter_test.go` first.
+Tune offline with `threads-leads.exe reclassify` (reruns rules over stored posts, no API calls, changes nothing):
+2026-11-06 on 1873 stored posts the old rules accepted 551, the current ones 129, mostly real orders.
+API source drops replies inside other threads (`LEAD_SKIP_REPLIES=true`).
+
+Region filter (`internal/filter/region.go`, `LEAD_REGION_FILTER=true` by default): the target market is Russian- and
+Kazakh-speaking. Russian and Kazakh posts always pass; Ukrainian/Belarusian (letters ї є ґ ў, or "і" without Kazakh
+letters/words) are dropped; English passes only with a CIS marker: city/country word, +7/+998/+996 phone code, ₸/₽,
+flag emoji, .kz/.uz domain, username segment like `kz`/`almaty`, or any Cyrillic word in the text. Posts carry no
+location, so this is a heuristic. Kazakh is verb-final, so for Kazakh text the tech→intent window is also 60 runes.
+Queries: `config/queries.go` = dev RU, devops RU, web RU, Kazakh, English pinned to the region ("developer Almaty").
 
 ## Hard-won facts (2026-10-09)
 - Chrome with `--enable-automation` (go-rod default) gets a 404 shell from threads.com and Meta drops the session right after
@@ -76,6 +88,7 @@ Rules are in `internal/filter/rules.go`; every real false positive goes into `fi
 - If Chrome was left running, launch fails once, the app kills Chrome processes bound to the profile and retries.
 
 ## Next
-1. Main mode now: `threads-leads.exe run -api -every 75m` (no Chrome). Browser mode stays as a wider, slower source.
+1. Main mode now: `threads-leads.exe run -api -every 60m` (no Chrome; ~80 queries → min interval ~58 min).
+   Browser mode stays as a wider, slower source.
 2. Filter tuning on real output; rule-based has a ceiling → LLM classification / scoring for the leads that pass rules.
 3. API mode in Docker on a server (no desktop needed); token refresh before the 60-day expiry.

@@ -26,6 +26,8 @@ type Client struct {
 	token string
 	limit int
 	http  *http.Client
+	// SkipReplies drops posts that are replies inside someone else's thread.
+	SkipReplies bool
 }
 
 func New(token string, limit int) *Client {
@@ -82,12 +84,13 @@ func (c *Client) Search(ctx context.Context, query string) ([]model.Post, error)
 			Username  string `json:"username"`
 			Permalink string `json:"permalink"`
 			Timestamp string `json:"timestamp"`
+			IsReply   bool   `json:"is_reply"`
 		} `json:"data"`
 	}
 	params := url.Values{
 		"q":           {query},
 		"search_type": {"RECENT"},
-		"fields":      {"id,text,username,permalink,timestamp,media_type"},
+		"fields":      {"id,text,username,permalink,timestamp,media_type,is_reply"},
 		"limit":       {strconv.Itoa(c.limit)},
 	}
 	if err := c.get(ctx, "/keyword_search", params, &r); err != nil {
@@ -95,6 +98,9 @@ func (c *Client) Search(ctx context.Context, query string) ([]model.Post, error)
 	}
 	posts := make([]model.Post, 0, len(r.Data))
 	for _, d := range r.Data {
+		if c.SkipReplies && d.IsReply {
+			continue
+		}
 		posts = append(posts, model.Post{
 			Source:      model.SourceThreads,
 			Username:    d.Username,

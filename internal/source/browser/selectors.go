@@ -49,6 +49,7 @@ var extractJS = withSelectors(`() => {
       if (!s) continue;
       if (/^\d+([.,]\d+)?[KkMm]?$/.test(s)) continue; // like/reply counters
       if (s === m[1]) continue;                      // bare username
+      if (s === "Translate" || s === "Перевести" || s === "Аудару") continue; // translate button
       if (/^(\d+[smhdw]|\d{1,2}\/\d{1,2}\/\d{2,4})$/.test(s)) continue; // "3d", "10/13/26"
       lines.push(s);
     }

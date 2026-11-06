@@ -15,7 +15,7 @@ var spaceRe = regexp.MustCompile(`\s+`)
 // ("check the website ... things you need"). Intent normally precedes the role
 // ("need a developer"); the reverse order is only accepted when adjacent ("developer needed").
 const (
-	gapIntentThenTech = 60 // runes between the end of the intent word and the start of the tech word
+	gapIntentThenTech = 40 // runes between the end of the intent word and the start of the tech word
 	gapTechThenIntent = 15
 )
 
@@ -27,8 +27,15 @@ type hit struct {
 // Classify returns the post enriched with match data; ok=false means not relevant.
 func Classify(p model.Post, now time.Time) (model.Lead, bool) {
 	text := strings.ToLower(spaceRe.ReplaceAllString(p.Text, " "))
+	text = strings.TrimSuffix(text, " translate") // button label captured by older browser runs
 	if text == "" {
 		return model.Lead{}, false
+	}
+	lang := DetectLang(p.Text)
+	if RegionFilter {
+		if _, ok := InRegion(p); !ok {
+			return model.Lead{}, false
+		}
 	}
 	for _, neg := range NegativePatterns {
 		if strings.Contains(text, neg) {
@@ -36,11 +43,23 @@ func Classify(p model.Post, now time.Time) (model.Lead, bool) {
 		}
 	}
 	runes := []rune(text)
-	tech := findHits(runes, TechKeywords)
+	strong := findHits(runes, StrongTech)
+	weak := findHits(runes, WeakTech)
 	intent := findHits(runes, HiringKeywords)
-	if len(tech) == 0 || len(intent) == 0 || !near(intent, tech) {
+	if len(intent) == 0 || len(strong)+len(weak) == 0 {
 		return model.Lead{}, false
 	}
+	// Kazakh puts the verb last ("бағдарламашы керек"), so the reverse order gets the wide window too.
+	symmetric := lang == LangKK
+	switch {
+	case near(intent, strong, symmetric):
+		// asking for a specialist is enough
+	case near(intent, weak, symmetric) && seeksPerson(text, runes):
+		// asking for a site/bot/app only counts when a person or a budget is mentioned
+	default:
+		return model.Lead{}, false
+	}
+	tech := append(strong, weak...)
 	category := "unknown"
 	for _, rule := range CategoryRules {
 		if len(findHits(runes, rule.Words)) > 0 {
@@ -57,14 +76,32 @@ func Classify(p model.Post, now time.Time) (model.Lead, bool) {
 	}, true
 }
 
+// seeksPerson reports whether the text mentions a person to hire or money for the job.
+func seeksPerson(text string, runes []rune) bool {
+	if len(findHits(runes, SeekMarkers)) > 0 {
+		return true
+	}
+	for _, sub := range SeekSubstrings {
+		if strings.Contains(text, sub) {
+			return true
+		}
+	}
+	return false
+}
+
 // near reports whether some intent hit and some tech hit are close enough.
-func near(intent, tech []hit) bool {
+// symmetric widens the tech-then-intent window to the same size as intent-then-tech.
+func near(intent, tech []hit, symmetric bool) bool {
+	reverse := gapTechThenIntent
+	if symmetric {
+		reverse = gapIntentThenTech
+	}
 	for _, in := range intent {
 		for _, t := range tech {
 			if t.start >= in.end && t.start-in.end <= gapIntentThenTech {
 				return true
 			}
-			if in.start >= t.end && in.start-t.end <= gapTechThenIntent {
+			if in.start >= t.end && in.start-t.end <= reverse {
 				return true
 			}
 		}

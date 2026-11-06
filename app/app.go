@@ -12,6 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/esbolll/threads-leads/config"
+	"github.com/esbolll/threads-leads/internal/filter"
 	"github.com/esbolll/threads-leads/internal/lead/repository"
 	"github.com/esbolll/threads-leads/internal/lead/usecase"
 	"github.com/esbolll/threads-leads/internal/notify/telegram"
@@ -81,6 +82,7 @@ func (a *App) Run(ctx context.Context, opts RunOptions) error {
 	collector := usecase.NewCollector(repo, src, notifier, a.log, a.out)
 	collector.MaxAge = time.Duration(a.cfg.LeadMaxAgeDays) * 24 * time.Hour
 	collector.CurrentMonthOnly = a.cfg.LeadCurrentMonthOnly
+	filter.RegionFilter = a.cfg.LeadRegionFilter
 	for pass := 1; ; pass++ {
 		sum, err := collector.Run(ctx, queries)
 		if err != nil {
@@ -113,6 +115,7 @@ func (a *App) apiClient(ctx context.Context) (*threadsapi.Client, error) {
 		return nil, fmt.Errorf("THREADS_TOKEN is empty: run `auth` first")
 	}
 	api := threadsapi.New(a.cfg.Threads.Token, a.cfg.Threads.SearchLimit)
+	api.SkipReplies = a.cfg.LeadSkipReplies
 	user, err := api.Me(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("token check failed: %w", err)
@@ -236,6 +239,38 @@ func (a *App) Export(ctx context.Context, limit int) error {
 	enc := json.NewEncoder(a.out)
 	enc.SetIndent("", "  ")
 	return enc.Encode(leads)
+}
+
+// Reclassify runs the current filter over every stored post and prints what it would accept.
+// It changes nothing and calls no API: use it to tune rules on real data.
+func (a *App) Reclassify(ctx context.Context) error {
+	repo, err := repository.Open(a.cfg.DBPath)
+	if err != nil {
+		return err
+	}
+	defer repo.Close()
+	filter.RegionFilter = a.cfg.LeadRegionFilter
+	posts, err := repo.AllPosts(ctx)
+	if err != nil {
+		return err
+	}
+	now := time.Now().UTC()
+	n := 0
+	for _, p := range posts {
+		lead, ok := filter.Classify(p, now)
+		if !ok {
+			continue
+		}
+		n++
+		text := strings.Join(strings.Fields(p.Text), " ")
+		if r := []rune(text); len(r) > 160 {
+			text = string(r[:160]) + "…"
+		}
+		fmt.Fprintf(a.out, "- %.10s @%s [%s | %s] %s\n", p.PostedAt, p.Username,
+			strings.Join(lead.MatchedIntent, ","), strings.Join(lead.MatchedTech, ","), text)
+	}
+	fmt.Fprintf(a.out, "posts: %d, accepted by current rules: %d\n", len(posts), n)
+	return nil
 }
 
 // Stats prints row counts.

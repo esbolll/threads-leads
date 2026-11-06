@@ -154,6 +154,15 @@ func (r *Repository) Recent(ctx context.Context, limit int) ([]model.Lead, error
 	return out, nil
 }
 
+// AllPosts returns every stored post, newest first.
+func (r *Repository) AllPosts(ctx context.Context) ([]model.Post, error) {
+	var posts []model.Post
+	err := r.db.SelectContext(ctx, &posts, `
+		SELECT source, username, display_name, text, permalink, post_id, posted_at, search_query, first_seen_at, last_seen_at
+		FROM posts ORDER BY first_seen_at DESC`)
+	return posts, err
+}
+
 type Stats struct {
 	Posts      int `db:"posts"`
 	Leads      int `db:"leads"`

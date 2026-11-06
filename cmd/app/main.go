@@ -27,6 +27,7 @@ Commands:
   tg chats   list chats the bot has seen (to find the channel id)
   export     print latest leads as JSON  (-n 100)
   stats      print database counts
+  reclassify run the current filter over stored posts (no API calls), to tune rules
 `
 
 func main() {
@@ -86,6 +87,8 @@ func main() {
 		err = a.Export(ctx, *n)
 	case "stats":
 		err = a.Stats(ctx)
+	case "reclassify":
+		err = a.Reclassify(ctx)
 	case "help", "-h", "--help":
 		fmt.Print(usage)
 	default:

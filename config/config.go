@@ -15,6 +15,10 @@ type Config struct {
 	LeadMaxAgeDays int `env:"LEAD_MAX_AGE_DAYS" envDefault:"0"`
 	// Only leads posted in the current calendar month are shown or sent.
 	LeadCurrentMonthOnly bool `env:"LEAD_CURRENT_MONTH_ONLY" envDefault:"false"`
+	// Keep only Russian/Kazakh posts, plus English ones with a CIS marker (city, phone code, flag, domain...).
+	LeadRegionFilter bool `env:"LEAD_REGION_FILTER" envDefault:"true"`
+	// Drop replies inside other people's threads (API source only; they are mostly chatter).
+	LeadSkipReplies bool `env:"LEAD_SKIP_REPLIES" envDefault:"true"`
 
 	Threads  Threads
 	Browser  Browser

@@ -8,6 +8,9 @@ import (
 )
 
 func TestClassify(t *testing.T) {
+	// Rule tests are language-agnostic; the region filter has its own test.
+	RegionFilter = false
+	defer func() { RegionFilter = true }()
 	cases := []struct {
 		text string
 		want bool
@@ -65,5 +68,51 @@ func TestPostKey(t *testing.T) {
 	c := model.Post{Username: "u", Text: "hi"}
 	if c.Key() == "" || c.Key()[:5] != "hash:" {
 		t.Errorf("hash key expected, got %s", c.Key())
+	}
+}
+
+func TestRegionFilter(t *testing.T) {
+	RegionFilter = true
+	cases := []struct {
+		user, text string
+		lang       string
+		want       bool
+	}{
+		// Russian and Kazakh always pass
+		{"someone", "Нужен Python разработчик на небольшой проект.", LangRU, true},
+		{"someone", "Ищу DevOps для настройки Kubernetes и CI/CD.", LangRU, true},
+		{"someone", "Сайт жасап беретін бағдарламашы керек, бюджет бар", LangKK, true},
+		{"someone", "Телеграм бот жасау керек, кім жасайды?", LangKK, true},
+		// English without a regional marker is dropped
+		{"berlin_ceo070", "I need website developers for restaurant budget 350$", LangEN, false},
+		{"xythonix", "Hiring a DevOps Engineer (AWS + CI/CD + Kubernetes)", LangEN, false},
+		// English with a regional marker passes
+		{"someone", "Looking for a backend developer in Almaty, office or remote", LangEN, true},
+		{"himark.kz", "Need a developer for a landing page", LangEN, true},
+		{"someone", "Hiring frontend developer, Kazakhstan 🇰🇿, salary in KZT", LangEN, true},
+		{"someone", "Need a devops engineer, contact +7 701 123 45 67", LangEN, true},
+		// real noise from the first API pass: everyday talk around "сайт", "приложение", "заказ"
+		{"someone", "Большой сайт нужен только очень большой организации. Остальным - стильный крутой лендинг", LangRU, false},
+		{"someone", "Со временем главный экран телевизора превращается в рекламную площадку, где найти нужное приложение сложнее. Проект", LangRU, false},
+		{"someone", "Я бы не искала одну лучшую CRM - всё зависит от процессов бизнеса. Нужна автоматизация или нет", LangRU, false},
+		{"someone", "Один из моих проектов — интернет-магазин премиального бренда. Нужен был сайт", LangRU, false},
+		{"someone", "NEW COLLECTION пальто цвет: черный. Заказ через app", LangRU, false},
+		// real leads from the same pass
+		{"jurek_syru", "‼️ Срочно ‼️ сайт жасайтын маман керек жұмысына ұқыпты тиянақты, жекеме жазыңыз", LangKK, true},
+		{"someone", "Привет! Мне нужен лендинг, кстати!!! На днях думала заняться поисками специалиста", LangRU, true},
+		{"someone", "Нужен сайт для кофейни, бюджет 300 000 тг, кто сделает?", LangRU, true},
+		// Ukrainian is not our market
+		{"someone", "Шукаю розробника для проєкту, потрібен сайт під ключ, є бюджет", LangOther, false},
+		{"eugeeenia.p", "DevOps інженерка. Шукаю роботу", LangOther, false},
+	}
+	now := time.Now()
+	for _, c := range cases {
+		if got := DetectLang(c.text); got != c.lang {
+			t.Errorf("%q: lang=%s want %s", c.text, got, c.lang)
+		}
+		_, ok := Classify(model.Post{Username: c.user, Text: c.text}, now)
+		if ok != c.want {
+			t.Errorf("%q (@%s): relevant=%v want %v", c.text, c.user, ok, c.want)
+		}
 	}
 }
