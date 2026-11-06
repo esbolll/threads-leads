@@ -1,0 +1,18 @@
+services:
+  threads-leads:
+    build: .
+    image: threads-leads:local
+    container_name: threads-leads
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      TZ: Asia/Almaty
+      DB_PATH: /app/data/leads.db
+    volumes:
+      - ./data:/app/data
+    command: ["run", "-api", "-every", "60m"]
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -1,0 +1,7 @@
+.git
+.env
+*.exe
+data/
+output/
+threads_profile/
+docs/
