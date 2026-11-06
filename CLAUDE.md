@@ -91,7 +91,7 @@ Queries: `config/queries.go` = dev RU, devops RU, web RU, Kazakh, English pinned
 - `ssh kds`, project in `/home/ubuntu/threads-leads` (git clone of this repo), runs in Docker: API mode only,
   `docker-compose.yml` → `run -api -every 60m`, `restart: unless-stopped`, TZ Asia/Almaty, `./data` volume (SQLite).
 - `.env` and `data/leads.db` were copied from the dev machine (not in git). `.env` on the server must have LF line
-  endings: `sed -i "s/$//" .env`, otherwise Docker reads tokens with a trailing CR.
+  endings: `sed -i 's/\r$//' .env`, otherwise Docker reads tokens with a trailing CR.
 - Update: `git push` here, then `ssh kds 'cd /home/ubuntu/threads-leads && git pull && docker compose up -d --build'`.
 - Logs: `ssh kds 'cd /home/ubuntu/threads-leads && docker compose logs --tail 100'`. Stats: `docker compose run --rm threads-leads stats`.
 - Token expires 60 days after `auth` (last run 2026-10-20 → about 2026-12-19). `auth` needs a browser, so run it on the
